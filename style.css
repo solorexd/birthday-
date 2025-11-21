@@ -1,17 +1,198 @@
-/* Romantic Birthday Theme CSS */
+// script.js - simple interactive birthday card
+(() => {
+  // DOM references
+  const nameEl = document.getElementById('name');
+  const greeting = document.getElementById('greeting');
+  const flame = document.getElementById('flame');
+  const candle = document.getElementById('candle');
+  const blowBtn = document.getElementById('blowBtn');
+  const musicBtn = document.getElementById('musicBtn');
+  const shareBtn = document.getElementById('shareBtn');
+  const bgMusic = document.getElementById('bgMusic');
+  const confettiCanvas = document.getElementById('confetti');
+  const balloonsContainer = document.getElementById('balloons');
 
-body { margin: 0; padding: 0; background: linear-gradient(135deg, #ff6b95, #ffb3c6); font-family: 'Poppins', sans-serif; overflow: hidden; }
+  // Read name from URL ?name=...
+  function readNameFromURL(){
+    const params = new URLSearchParams(location.search);
+    const n = params.get('name')  params.get('to')  '';
+    return decodeURIComponent(n).trim() || 'Friend';
+  }
+  const PERSON = readNameFromURL();
+  nameEl.textContent = PERSON;
 
-/* Balloons */ .balloon { position: absolute; width: 60px; height: 80px; background: radial-gradient(circle, #ff9ebd, #ff4b8e); border-radius: 50% 50% 45% 45%; animation: float 6s infinite ease-in; opacity: 0.85; } @keyframes float { 0% { transform: translateY(100vh); } 100% { transform: translateY(-120vh); } }
+  // Share button copies the current URL (preserving ?name=)
+  shareBtn.addEventListener('click', async () => {
+    const url = location.origin + location.pathname + '?name=' + encodeURIComponent(PERSON);
+    try {
+      await navigator.clipboard.writeText(url);
+      shareBtn.textContent = 'Link Copied!';
+      setTimeout(()=> shareBtn.textContent = 'Copy Share Link', 1500);
+    } catch (e) {
+      alert('Copy this link: ' + url);
+    }
+  });
 
-/* Card */ .card { width: 360px; background: rgba(255, 255, 255, 0.9); margin: 70px auto; padding: 30px; border-radius: 30px; text-align: center; box-shadow: 0 0 30px rgba(255, 20, 100, 0.5); animation: glow 3s infinite alternate; } @keyframes glow { 0% { box-shadow: 0 0 20px #ff4b8e; } 100% { box-shadow: 0 0 40px #ff94c7; } }
+  // Music toggle
+  let musicPlaying = false;
+  musicBtn.addEventListener('click', async () => {
+    if (!musicPlaying) {
+      try {
+        await bgMusic.play();
+        musicPlaying = true;
+        musicBtn.textContent = 'Pause Music';
+      } catch (err) {
+        alert('Playback prevented by browser — interact with the page and try again.');
+      }
+    } else {
+      bgMusic.pause();
+      musicPlaying = false;
+      musicBtn.textContent = 'Play Music';
+    }
+  });
 
-h1 { color: #ff1f6b; font-size: 28px; } #name { color: #b3004b; font-weight: bold; }
+  // Candle state
+  let isLit = true;
+  function setCandle(lit){
+    isLit = !!lit;
+    flame.style.opacity = isLit ? '1' : '0';
+    flame.style.transform = isLit ? 'scale(1)' : 'scale(0.6) translateY(-6px)';
+    if (!isLit) {
+      launchConfetti();
+      spawnBalloons(8);
+    }
+  }
 
-/* Input */ .inputBox { margin: 15px auto; display: flex; justify-content: center; gap: 10px; } input { padding: 10px 15px; border-radius: 12px; border: 1px solid #ff5c9a; background: #ffe6ef; }
+  // Toggle by button
+  blowBtn.addEventListener('click', ()=> setCandle(!isLit));
 
-/* Candle */ .candle { width: 14px; height: 65px; background: #ffdd55; margin: 25px auto; border-radius: 5px; position: relative; box-shadow: 0 0 10px rgba(255, 200, 0, 0.5); } .flame { width: 20px; height: 32px; background: radial-gradient(circle, yellow, orange, red); border-radius: 50%; position: absolute; top: -35px; left: 50%; transform: translateX(-50%); animation: flicker 0.25s infinite; } @keyframes flicker { 0% { opacity: 1; transform: translateX(-50%) scale(1); } 50% { opacity: 0.6; transform: translateX(-50%) scale(1.15); } 100% { opacity: 1; transform: translateX(-50%) scale(1); } }
+  // Microphone "blow" detection
+  async function startBlowDetect(){
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: false});
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.fftSize);
 
-/* Button */ .btn { margin-top: 25px; padding: 12px 25px; background: #ff3f81; color: white; border-radius: 15px; border: none; cursor: pointer; font-size: 17px; transition: 0.3s; } .btn:hover { background: #e30067; }
+      let lastBlow = 0;
+      function detect(){
+        analyser.getByteTimeDomainData(data);
+        // compute RMS-ish
+        let sum=0;
+        for (let i=0;i<data.length;i++){
+          const v = (data[i]-128)/128;
+          sum += v*v;
+        }
+        const rms = Math.sqrt(sum/data.length);
+        // hair threshold — tweak if needed
+        if (rms > 0.12 && Date.now() - lastBlow > 900){
+          lastBlow = Date.now();
+          // extinguish if lit
+          if (isLit) setCandle(false);
+        }
+        requestAnimationFrame(detect);
+      }
+      detect();
+    } catch(e){
+      console.warn('Mic access denied or not available', e);
+    }
+  }
+  startBlowDetect();
 
-/* Confetti */ .confetti { position: fixed; width: 10px; height: 10px; background: pink; animation: fall 3s linear infinite; } @keyframes fall { 0% { opacity: 1; transform: translateY(-20px); } 100% { opacity: 0; transform: translateY(120vh); } }
+  // Confetti system (simple)
+  function launchConfetti(){
+    const c = confettiCanvas;
+    c.width = innerWidth; c.height = innerHeight;
+    const ctx = c.getContext('2d');
+    const pieces = [];
+    const colors = ['#ff6b6b','#ffd54a','#8bd3c7','#7aa2ff','#d07bff','#ffffff'];
+
+    for (let i=0;i<120;i++){
+      pieces.push({x: Math.random()*c.width,
+        y: Math.random()*c.height - c.height,
+        vx: (Math.random()-0.5)*6,
+        vy: 2 + Math.random()*6,
+        size: 6 + Math.random()*8,
+        color: colors[Math.floor(Math.random()*colors.length)],
+        rot: Math.random()*360,
+        rotSpeed: (Math.random()-0.5)*10
+      });
+    }
+    let t0 = performance.now();
+    function frame(now){
+      const dt = Math.min(64, now - t0); t0 = now;
+      ctx.clearRect(0,0,c.width,c.height);
+      for (let p of pieces){
+        p.x += p.vx * (dt/16);
+        p.y += p.vy * (dt/16);
+        p.rot += p.rotSpeed * (dt/16);
+        ctx.save();
+        ctx.translate(p.x,p.y);
+        ctx.rotate(p.rot * Math.PI/180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size*0.6);
+        ctx.restore();
+      }
+      // stop after some time
+      if (performance.now() - t0 < 8000) requestAnimationFrame(frame);
+      // clear after 5s
+      setTimeout(()=> ctx.clearRect(0,0,c.width,c.height), 5000);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // Balloons (floating DOM nodes)
+  function spawnBalloons(count=6){
+    for (let i=0;i<count;i++){
+      const b = document.createElement('div');
+      b.className = 'balloon';
+      const size = 36 + Math.floor(Math.random()*60);
+      b.style.width = size + 'px';
+      b.style.height = Math.round(size * 1.2) + 'px';
+      b.style.borderRadius = Math.round(size*0.6)+'px';
+      b.style.position = 'fixed';
+      b.style.left = (10 + Math.random()*80) + '%';
+      b.style.bottom = '-120px';
+      b.style.zIndex = 1;
+      b.style.pointerEvents = 'none';
+      b.style.opacity = 0.95;
+      b.style.background = linear-gradient(180deg, rgba(255,255,255,0.6), transparent), ${randomColor()};
+      b.style.boxShadow = '0 8px 24px rgba(0,0,0,0.25)';
+      balloonsContainer.appendChild(b);
+
+      const duration = 5000 + Math.random()*4800;
+      b.animate([
+        { transform: translateY(0) rotate(0deg) },
+        { transform: translateY(-${innerHeight + 220}px) rotate(${ (Math.random()-0.5)*120 }deg) }
+      ], { duration, easing: 'linear' });
+
+      setTimeout(()=> b.remove(), duration + 400);
+    }
+  }
+  function randomColor(){
+    const arr = ['#ff6b6b','#ffb86b','#ffd54a','#7ee0c2','#7aa2ff','#d07bff'];
+    return arr[Math.floor(Math.random()*arr.length)];
+  }
+
+  // small initial floatiness
+  setInterval(()=> spawnBalloons(1), 3000);
+
+  // small entrance confetti for initial view
+  setTimeout(()=> launchConfetti(), 800);
+
+  // small flourish if user clicks cake
+  candle.addEventListener('click', ()=> setCandle(!isLit));
+
+  // keep canvas size on resize
+  window.addEventListener('resize', ()=> {
+    confettiCanvas.width = innerWidth;
+    confettiCanvas.height = innerHeight;
+  });
+
+  // finished
+  setCandle(true);
+})();
