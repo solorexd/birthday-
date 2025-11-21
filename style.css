@@ -1,0 +1,17 @@
+/* Romantic Birthday Theme CSS */
+
+body { margin: 0; padding: 0; background: linear-gradient(135deg, #ff6b95, #ffb3c6); font-family: 'Poppins', sans-serif; overflow: hidden; }
+
+/* Balloons */ .balloon { position: absolute; width: 60px; height: 80px; background: radial-gradient(circle, #ff9ebd, #ff4b8e); border-radius: 50% 50% 45% 45%; animation: float 6s infinite ease-in; opacity: 0.85; } @keyframes float { 0% { transform: translateY(100vh); } 100% { transform: translateY(-120vh); } }
+
+/* Card */ .card { width: 360px; background: rgba(255, 255, 255, 0.9); margin: 70px auto; padding: 30px; border-radius: 30px; text-align: center; box-shadow: 0 0 30px rgba(255, 20, 100, 0.5); animation: glow 3s infinite alternate; } @keyframes glow { 0% { box-shadow: 0 0 20px #ff4b8e; } 100% { box-shadow: 0 0 40px #ff94c7; } }
+
+h1 { color: #ff1f6b; font-size: 28px; } #name { color: #b3004b; font-weight: bold; }
+
+/* Input */ .inputBox { margin: 15px auto; display: flex; justify-content: center; gap: 10px; } input { padding: 10px 15px; border-radius: 12px; border: 1px solid #ff5c9a; background: #ffe6ef; }
+
+/* Candle */ .candle { width: 14px; height: 65px; background: #ffdd55; margin: 25px auto; border-radius: 5px; position: relative; box-shadow: 0 0 10px rgba(255, 200, 0, 0.5); } .flame { width: 20px; height: 32px; background: radial-gradient(circle, yellow, orange, red); border-radius: 50%; position: absolute; top: -35px; left: 50%; transform: translateX(-50%); animation: flicker 0.25s infinite; } @keyframes flicker { 0% { opacity: 1; transform: translateX(-50%) scale(1); } 50% { opacity: 0.6; transform: translateX(-50%) scale(1.15); } 100% { opacity: 1; transform: translateX(-50%) scale(1); } }
+
+/* Button */ .btn { margin-top: 25px; padding: 12px 25px; background: #ff3f81; color: white; border-radius: 15px; border: none; cursor: pointer; font-size: 17px; transition: 0.3s; } .btn:hover { background: #e30067; }
+
+/* Confetti */ .confetti { position: fixed; width: 10px; height: 10px; background: pink; animation: fall 3s linear infinite; } @keyframes fall { 0% { opacity: 1; transform: translateY(-20px); } 100% { opacity: 0; transform: translateY(120vh); } }
